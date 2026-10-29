@@ -1,4 +1,4 @@
-name: Windows 11 ARM64 RDP via Tailscale
+name: Windows 11 ARM64 RDp via Tailscale
 
 on:
   workflow_dispatch:
