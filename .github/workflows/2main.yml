@@ -168,43 +168,43 @@ jobs:
       - name: Minimize annoying console windows
         shell: pwsh
         run: |
-          # Kill WSL prompts
+          # Kill WSL prompts immediately
           taskkill /F /IM wsl.exe /T 2>$null | Out-Null
           try { wsl --shutdown 2>$null } catch {}
 
-          # Continuous minimizer (runs in background for ~2 minutes)
-          $job = Start-Job -ScriptBlock {
-            Add-Type @"
-            using System;
-            using System.Runtime.InteropServices;
-            public class Win32 {
-              [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-              [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-              public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-              [DllImport("user32.dll", CharSet=CharSet.Auto)]
-              public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
-            }
+          # Simple & reliable minimizer (no complex here-strings)
+          $minimizeCode = {
+            Add-Type -TypeDefinition @"
+          using System;
+          using System.Runtime.InteropServices;
+          public class Win32 {
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+            [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+            public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+            [DllImport("user32.dll", CharSet = CharSet.Auto)]
+            public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+          }
 "@
-            $end = (Get-Date).AddMinutes(2)
-            while ((Get-Date) -lt $end) {
-              $callback = {
-                param($hWnd, $lParam)
-                $sb = New-Object System.Text.StringBuilder 256
-                [void][Win32]::GetWindowText($hWnd, $sb, 256)
-                $title = $sb.ToString()
-                if ($title -match "HostedComputeAgent|hosted-compute-agent|wsl|WSL") {
-                  [Win32]::ShowWindow($hWnd, 6) | Out-Null  # minimize
-                }
-                $true
+            $callback = {
+              param($hWnd, $lParam)
+              $sb = New-Object System.Text.StringBuilder 256
+              [void][Win32]::GetWindowText($hWnd, $sb, 256)
+              $title = $sb.ToString()
+              if ($title -match "HostedComputeAgent|hosted-compute-agent|wsl|WSL") {
+                [Win32]::ShowWindow($hWnd, 6) | Out-Null
               }
-              [Win32]::EnumWindows($callback, [IntPtr]::Zero)
-              Start-Sleep -Seconds 4
+              return $true
             }
+            [Win32]::EnumWindows($callback, [IntPtr]::Zero)
           }
 
-          # Wait a bit so the job starts cleaning
-          Start-Sleep -Seconds 15
-          Write-Host "Annoying windows minimizer started (background)."
+          # Run minimizer several times
+          1..12 | ForEach-Object {
+            & $minimizeCode
+            Start-Sleep -Seconds 5
+          }
+
+          Write-Host "Annoying console windows minimized."
 
       - name: Keep runner active
         shell: pwsh
@@ -215,4 +215,4 @@ jobs:
             if ($i % 10 -eq 0) {
               Write-Host "RDP runner active: $i / $totalMinutes minutes"
             }
-          } 
+          }
