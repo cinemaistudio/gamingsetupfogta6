@@ -165,20 +165,6 @@ jobs:
           $global:LASTEXITCODE = 0
           exit 0
 
-      - name: Minimize annoying console windows
-        shell: pwsh
-        run: |
-          # Only close HostedComputeAgent windows - NO WSL kill
-          1..12 | ForEach-Object {
-            Get-Process | Where-Object {
-              $_.MainWindowTitle -match "HostedComputeAgent|hosted-compute-agent"
-            } | ForEach-Object {
-              try { $_.CloseMainWindow() | Out-Null } catch {}
-            }
-            Start-Sleep -Seconds 4
-          }
-          Write-Host "Annoying windows closed."
-
       - name: Keep runner active
         shell: pwsh
         run: |
